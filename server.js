@@ -1,8 +1,6 @@
 const express = require('express');
+const puppeteer = require('puppeteer');
 const app = express();
-const axios = require('axios');
-const cheerio = require('cheerio');
-const iconv = require('iconv-lite');
 
 const VALID_API_KEY = process.env.API_KEY;
 
@@ -20,77 +18,67 @@ const checkApiKey = (req, res, next) => {
 
 app.use(checkApiKey);
 
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
     const item_id = req.query.item_id;
     if (!item_id) {
-        return res.status(400).send({
-            data: {
-                content: 'item_id is required'
-            }
-        });
+        return res.status(400).send({ data: { content: 'item_id is required' } });
     }
 
     const url = `https://fanqienovel.com/reader/${item_id}`;
 
-    axios.get(url, {
-        responseType: 'arraybuffer'
-    })
-    .then(response => {
-        const html = iconv.decode(Buffer.from(response.data), 'gbk');
-        const $ = cheerio.load(html);
+    try {
+        const browser = await puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        const page = await browser.newPage();
 
-        const scriptTag = $('script').filter((i, el) => {
-            return $(el).html().includes('window.__INITIAL_STATE__');
-        }).first();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0');
+        await page.setExtraHTTPHeaders({
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'accept-language': 'vi,en-US;q=0.9,en;q=0.8',
+            'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Microsoft Edge";v="134"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'document',
+            'sec-fetch-mode': 'navigate',
+            'sec-fetch-site': 'none',
+            'sec-fetch-user': '?1',
+            'upgrade-insecure-requests': '1'
+        });
 
-        if (!scriptTag.length) {
-            return res.status(404).send({
-                data: {
-                    content: 'Script tag not found'
-                }
-            });
-        }
+        await page.goto(url, { waitUntil: 'networkidle2' });
 
-        const scriptText = scriptTag.html();
-        const startPos = scriptText.indexOf('=', scriptText.indexOf('window.__INITIAL_STATE__')) + 1;
-        const endPos = scriptText.lastIndexOf(';') - 1;
-        let jsonText = scriptText.substring(startPos, endPos + 1).trim();
+        await page.waitForSelector('.muye-reader-content', { timeout: 10000 });
 
-        const contentMatch = jsonText.match(/"content":"(.*?)","uid"/);
-        let content = contentMatch ? contentMatch[1] : null;
+        const content = await page.evaluate(() => {
+            const contentDiv = document.querySelector('.muye-reader-content');
+            if (contentDiv) {
+                const btns = contentDiv.querySelector('.muye-reader-btns');
+                if (btns) btns.remove();
+                return contentDiv.innerHTML.trim();
+            }
+            return null;
+        });
+
+        await browser.close();
 
         if (!content) {
-            return res.status(404).send({
-                data: {
-                    content: 'Chapter content not found'
-                }
-            });
+            return res.status(404).send({ data: { content: 'Chapter content not found' } });
         }
 
-        content = content
-            .replace(/\\u([\dA-Fa-f]{4})/g, (match, grp) => {
-                return String.fromCharCode(parseInt(grp, 16));
-            })
-            .replace(/\\n/g, '\n')
-            .replace(/\\"/g, '"')
-            .replace(/\\\\/g, '\\')
-            .replace(/u003C\/p>/g, '</p>')
-            .replace(/u003C/g, '<');
+        res.set({
+            'Content-Type': 'application/json; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'SAMEORIGIN',
+            'X-XSS-Protection': '1; mode=block'
+        });
 
-        res.send({
-            data: {
-                content: content.trim()
-            }
-        });
-    })
-    .catch(error => {
-        console.error('Axios error:', error.message);
-        res.status(500).send({
-            data: {
-                content: 'Internal server error'
-            }
-        });
-    });
+        res.send({ data: { content: content } });
+    } catch (error) {
+        console.error('Puppeteer error:', error.message);
+        res.status(500).send({ data: { content: 'Internal server error' } });
+    }
 });
 
 module.exports = app;
