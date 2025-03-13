@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "author": "TekMonts",
+    "description": "Extension for Fanqie"
+  },
+  "data": [
+    {
+      "name": "Fanqie Novel",
+      "author": "TekMonts",
+      "path": "https://github.com/TekMonts/vbook-fanqie-ext/releases/download/V1.0/plugin.zip",
+      "version": 1,
+      "source": "https://github.com/TekMonts/vbook-fanqie-ext",
+      "icon": "https://raw.githubusercontent.com/TekMonts/vbook-fanqie-ext/refs/heads/main/icon.png",
+      "description": "Đọc truyện trên trang fanqienovel.com",
+      "type": "chinese_novel",
+      "locale": "zh_CN"
+    } ]
+}
