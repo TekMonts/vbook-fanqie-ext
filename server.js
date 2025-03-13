@@ -1,36 +1,37 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 const app = express();
+
+app.use(express.json());
 
 const VALID_API_KEY = process.env.API_KEY;
 
 const checkApiKey = (req, res, next) => {
     const apiKey = req.headers['x-api-key'];
     if (!apiKey || apiKey !== VALID_API_KEY) {
-        return res.status(403).send({
-            data: {
-                content: "You don't have permission to access this API, please configure your API key in extension config."
-            }
+        return res.status(403).json({
+            data: { content: "You don't have permission to access this API, please configure your API key in extension config." }
         });
     }
     next();
 };
 
-app.use(checkApiKey);
-
-app.get('/', async (req, res) => {
+app.get('/', checkApiKey, async (req, res) => {
     const item_id = req.query.item_id;
     if (!item_id) {
-        return res.status(400).send({ data: { content: 'item_id is required' } });
+        return res.status(400).json({ data: { content: 'item_id is required'.trim() } });
     }
 
     const url = `https://fanqienovel.com/reader/${item_id}`;
 
     try {
         const browser = await puppeteer.launch({
-            headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: chromium.args,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
         });
+
         const page = await browser.newPage();
 
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0');
@@ -64,20 +65,13 @@ app.get('/', async (req, res) => {
         await browser.close();
 
         if (!content) {
-            return res.status(404).send({ data: { content: 'Chapter content not found' } });
+            return res.status(404).json({ data: { content: 'Chapter content not found' } });
         }
 
-        res.set({
-            'Content-Type': 'application/json; charset=utf-8',
-            'X-Content-Type-Options': 'nosniff',
-            'X-Frame-Options': 'SAMEORIGIN',
-            'X-XSS-Protection': '1; mode=block'
-        });
-
-        res.send({ data: { content: content } });
+        res.json({ data: { content: content } });
     } catch (error) {
         console.error('Puppeteer error:', error.message);
-        res.status(500).send({ data: { content: 'Internal server error' } });
+        res.status(500).json({ data: { content: `Internal server error: ${error.message}` } });
     }
 });
 
