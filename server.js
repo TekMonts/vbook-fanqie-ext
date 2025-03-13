@@ -42,23 +42,8 @@ app.get('/', async (req, res) => {
   try {
     const response = await axios.get(url, { headers, responseType: 'arraybuffer', timeout: 10000 });
     const contentEncoding = response.headers['content-encoding']?.toLowerCase() || '';
-    let html;
     const buffer = Buffer.from(response.data);
-    if (contentEncoding.includes('br')) {
-      const brotli = require('brotli');
-      const decompressed = brotli.decompress(buffer);
-      if (!decompressed) throw new Error('Brotli decompression returned null');
-      html = decompressed.toString('utf8');
-    } else if (contentEncoding.includes('gzip')) {
-      const zlib = require('zlib');
-      html = zlib.gunzipSync(buffer).toString('utf8');
-    } else if (contentEncoding.includes('deflate')) {
-      const zlib = require('zlib');
-      html = zlib.inflateSync(buffer).toString('utf8');
-    } else {
-      html = buffer.toString('utf8');
-    }
-
+    let html = buffer.toString('utf8');
     const $ = cheerio.load(html);
     const $contentNode = $('.muye-reader-content');
     if ($contentNode.length === 0) {
