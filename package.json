@@ -1,13 +1,13 @@
 {
   "name": "tekmonts-fanqie-api",
   "version": "1.0.0",
-  "main": "server.js",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.8",
+    "cheerio": "^1.0.0-rc.12",
+    "iconv-lite": "^0.6.3"
+  },
   "scripts": {
     "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^4.19.2",
-    "axios": "^1.7.2",
-    "cheerio": "^1.0.0-rc.12"
   }
 }
